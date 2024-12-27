@@ -5,8 +5,11 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '..' + '/' + '
 from typing import List, Optional
 import numpy as np
 from collections import Counter
-import logging
 import math
+
+from util.doc_chunk import DocChunker
+from util.tokenizer import tokenize_text
+from util.log_util import logger
 
 class BM25Compressor:
     """BM25-based document compression class.
@@ -15,26 +18,22 @@ class BM25Compressor:
     query-based and query-less compression modes.
     
     Attributes:
-        doc_chunker: DocChunker instance for text chunking
-        tokenize_func: Function for text tokenization
         k1: BM25 parameter for term frequency scaling
         b: BM25 parameter for length normalization
     """
     
-    def __init__(self, doc_chunker, tokenize_func, k1: float = 1.5, b: float = 0.75) -> None:
+    def __init__(self, k1: float = 1.5, b: float = 0.75) -> None:
         """Initialize BM25Compressor.
         
         Args:
-            doc_chunker: Instance of DocChunker for text chunking
-            tokenize_func: Function that takes text and returns token list
             k1: BM25 parameter for term frequency scaling (default: 1.5)
             b: BM25 parameter for length normalization (default: 0.75)
         """
-        self.doc_chunker = doc_chunker
-        self.tokenize_func = tokenize_func
+        self.doc_chunker = DocChunker() # doc_chunker: Instance of DocChunker for text chunking
+        self.tokenize_func = tokenize_text # tokenize_func: Function that takes text and returns token list
         self.k1 = k1
         self.b = b
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         
     def _calculate_bm25(self, chunks: List[str], query: Optional[str] = None) -> np.ndarray:
         """Calculate BM25 scores for document chunks.
@@ -195,9 +194,9 @@ class BM25Compressor:
             
         try:
             # 文档分块
-            chunks = self.doc_chunker.batch_chunk([doc])[0]
+            chunks = self.doc_chunker.batch_chunk([doc], return_counts=False)[0]
             if not chunks:
-                self.logger.warning("Document chunking produced no chunks")
+                self.logger.log_info("Document chunking produced no chunks")
                 return ""
                 
             # 计算BM25分数
@@ -213,8 +212,8 @@ class BM25Compressor:
                 
             # 记录压缩信息
             compression_ratio = len(''.join(selected_chunks)) / len(doc)
-            self.logger.info(f"Compression ratio: {compression_ratio:.2%}")
-            self.logger.info(f"BM25 parameters: k1={self.k1}, b={self.b}")
+            self.logger.log_info(f"Compression ratio: {compression_ratio:.2%}")
+            self.logger.log_info(f"BM25 parameters: k1={self.k1}, b={self.b}")
             
             return ''.join(selected_chunks)
             

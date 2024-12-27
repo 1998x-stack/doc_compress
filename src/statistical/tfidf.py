@@ -5,11 +5,11 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '..' + '/' + '
 from typing import List, Optional
 import numpy as np
 from collections import Counter
-import logging
 import math
 
 from util.doc_chunk import DocChunker
 from util.tokenizer import tokenize_text
+from util.log_util import logger
 
 class TFIDFCompressor:
     """TF-IDF based document compression class.
@@ -17,9 +17,6 @@ class TFIDFCompressor:
     This class implements document compression using TF-IDF scoring, supporting both
     query-based and query-less compression modes.
     
-    Attributes:
-        doc_chunker: DocChunker instance for text chunking
-        tokenize_func: Function for text tokenization
     """
     
     def __init__(self) -> None:
@@ -28,7 +25,7 @@ class TFIDFCompressor:
         self.doc_chunker = DocChunker() # doc_chunker: Instance of DocChunker for text chunking
         self.tokenize_func = tokenize_text # tokenize_func: Function that takes text and returns token list
         # 设置日志记录器
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         
     def _calculate_tfidf(self, chunks: List[str], query: Optional[str] = None) -> np.ndarray:
         """Calculate TF-IDF scores for document chunks.
@@ -167,7 +164,7 @@ class TFIDFCompressor:
         # 文档分块
         chunks = self.doc_chunker.batch_chunk([doc], return_counts=False)[0]
         if not chunks:
-            self.logger.warning("Document chunking produced no chunks")
+            self.logger.log_info("Document chunking produced no chunks")
             return ""
             
         # 计算TF-IDF分数
@@ -183,7 +180,7 @@ class TFIDFCompressor:
             
         # 记录压缩信息
         compression_ratio = len(''.join(selected_chunks)) / len(doc)
-        self.logger.info(f"Compression ratio: {compression_ratio:.2%}")
+        self.logger.log_info(f"Compression ratio: {compression_ratio:.2%}")
         
         # 返回压缩后的文档
         return ''.join(selected_chunks)
