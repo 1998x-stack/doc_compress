@@ -24,14 +24,31 @@ https://github.com/boudinfl/pke
 
 ### Statistical models
 #### TFIDF
-- [TFIDF文档](doc/TFIDF.md)
+- [TFIDF文档](doc/Statistical/TFIDF.md)
 - [TFIDF代码](src/statistical/tfidf.py)
 
 
 #### BM25
-- [BM25文档](doc/BM25.md)
+- [BM25文档](doc/Statistical/BM25.md)
 - [BM25代码](src/statistical/bm25.py)
 
+
+### Graph-based models
+#### TextRank
+- [TextRank文档](doc/Graph/TextRank.md)
+- [TextRank代码](src/graph/textrank.py)
+
+#### SingleRank
+- [SingleRank文档](doc/Graph/SingleRank.md)
+- [SingleRank代码](src/graph/singlerank.py)
+
+#### TopicRank
+- [TopicRank文档](doc/Graph/TopicRank.md)
+- [TopicRank代码](src/graph/topicrank.py)
+
+#### PositionRank
+- [PositionRank文档](doc/Graph/PositionRank.md)
+- [PositionRank代码](src/graph/positionrank.py)
 
 
 ## 总结
