@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 import networkx as nx
 import logging
 
-from src.graph.textrank import TextRankCompressor
+from doc_compress.graph.textrank import TextRankCompressor
 
 class PositionRankCompressor(TextRankCompressor):
     """基于PositionRank算法的文档压缩类。

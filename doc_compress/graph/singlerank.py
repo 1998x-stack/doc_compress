@@ -7,7 +7,7 @@ import numpy as np
 import networkx as nx
 import logging
 from sklearn.feature_extraction.text import TfidfVectorizer
-from src.graph.textrank import TextRankCompressor
+from doc_compress.graph.textrank import TextRankCompressor
 
 class SingleRankCompressor(TextRankCompressor):
     """基于SingleRank算法的文档压缩类。
