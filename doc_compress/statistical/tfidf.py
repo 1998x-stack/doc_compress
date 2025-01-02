@@ -59,6 +59,8 @@ class TFIDFCompressor:
             for i, counts in enumerate(chunk_token_counts):
                 chunk_score = 0
                 for token in query_token_set:
+                    if len(chunk_tokens[i]) == 0:
+                        continue
                     tf = counts.get(token, 0) / len(chunk_tokens[i])
                     chunk_score += tf * idf[token]
                 scores[i] = chunk_score
@@ -173,7 +175,7 @@ class TFIDFCompressor:
         # 根据条件选择压缩方式
         if max_length is not None:
             selected_chunks = self._get_chunks_by_length(chunks, scores, max_length)
-        else:
+        elif topn is not None:
             # 如果指定了topN，使用topN方式
             topn = min(topn, len(chunks))  # 确保topN不超过块数
             selected_chunks = self._get_chunks_by_topn(chunks, scores, topn)
