@@ -63,17 +63,22 @@ class SingleRankCompressor(TextRankCompressor):
         Returns:
             Dict[str, float]: 词语到TF-IDF权重的映射
         """
-        # 计算TF-IDF矩阵
-        tfidf_matrix = self.tfidf_vectorizer.fit_transform(chunks)
-        
-        # 获取特征名称（词语）
-        feature_names = self.tfidf_vectorizer.get_feature_names_out()
-        
-        # 计算每个词的平均TF-IDF权重
-        avg_weights = np.mean(tfidf_matrix.toarray(), axis=0)
-        
-        # 创建词语到权重的映射
-        return dict(zip(feature_names, avg_weights))
+        results = []
+        for chunk in chunks:
+            # 对当前 chunk 计算 TF-IDF
+            tfidf_matrix = self.tfidf_vectorizer.fit_transform([chunk])  # 注意：fit_transform 输入需要是列表
+            
+            # 获取特征名称（词语）
+            feature_names = self.tfidf_vectorizer.get_feature_names_out()
+            
+            # 计算每个词的平均 TF-IDF 权重
+            avg_weights = np.mean(tfidf_matrix.toarray(), axis=0)
+            
+            # 创建词语到权重的映射并添加到结果中
+            results.append(dict(zip(feature_names, avg_weights)))
+
+    # 返回最终的结果列表
+        return results[0]
     
     def _build_weighted_graph(
         self, 
@@ -213,10 +218,13 @@ class SingleRankCompressor(TextRankCompressor):
             
         try:
             # 文档分块
-            chunks = self.doc_chunker.batch_chunk([doc])[0]
+            chunks,_ = self.doc_chunker.batch_chunk(text_list=[doc])
+            chunks=chunks[0]
             if not chunks:
                 self.logger.warning("文档分块结果为空")
                 return ""
+            
+            
             
             # 计算块得分
             scores = self._calculate_chunk_scores(chunks, query)
@@ -237,7 +245,7 @@ class SingleRankCompressor(TextRankCompressor):
             )
             
             # 返回压缩结果
-            return ''.join(selected_chunks)
+            return ''.join(selected_chunks), compression_ratio
             
         except Exception as e:
             self.logger.error(f"文档压缩过程中发生错误: {str(e)}")

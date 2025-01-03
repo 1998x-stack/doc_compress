@@ -121,6 +121,7 @@ class PositionRankCompressor(TextRankCompressor):
         graph = nx.Graph()
         
         # 计算每个块中词语的位置权重
+        
         chunk_position_weights = self._calculate_chunk_position_weights(chunks)
         
         # 处理查询词（如果有）
@@ -248,7 +249,8 @@ class PositionRankCompressor(TextRankCompressor):
             
         try:
             # 文档分块
-            chunks = self.doc_chunker.batch_chunk([doc])[0]
+            chunks,_= self.doc_chunker.batch_chunk([doc])
+            chunks=chunks[0]
             if not chunks:
                 self.logger.warning("文档分块结果为空")
                 return ""
@@ -273,7 +275,7 @@ class PositionRankCompressor(TextRankCompressor):
             )
             
             # 返回压缩结果
-            return ''.join(selected_chunks)
+            return ''.join(selected_chunks),compression_ratio
             
         except Exception as e:
             self.logger.error(f"文档压缩过程中发生错误: {str(e)}")
