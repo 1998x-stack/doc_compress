@@ -215,7 +215,7 @@ class BM25Compressor:
             self.logger.log_info(f"Compression ratio: {compression_ratio:.2%}")
             self.logger.log_info(f"BM25 parameters: k1={self.k1}, b={self.b}")
             
-            return ''.join(selected_chunks)
+            return ''.join(selected_chunks),compression_ratio
             
         finally:
             # 恢复原始BM25参数

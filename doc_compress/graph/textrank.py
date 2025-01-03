@@ -10,6 +10,8 @@ import logging
 from enum import Enum
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
+from util.doc_chunk import DocChunker
+from util.tokenizer import tokenize_text
 
 class EdgeType(Enum):
     """Edge type for TextRank graph construction."""
@@ -33,8 +35,6 @@ class TextRankCompressor:
     
     def __init__(
         self,
-        doc_chunker,
-        tokenize_func,
         edge_type: EdgeType = EdgeType.COOCCURRENCE,
         window_size: int = 3,
         damping_factor: float = 0.85,
@@ -52,8 +52,8 @@ class TextRankCompressor:
             similarity_func: Custom similarity function (default: None)
             min_edge_weight: Minimum edge weight threshold (default: 0.1)
         """
-        self.doc_chunker = doc_chunker
-        self.tokenize_func = tokenize_func
+        self.doc_chunker = DocChunker()
+        self.tokenize_func = tokenize_text
         self.edge_type = edge_type
         self.window_size = window_size
         self.damping_factor = damping_factor
@@ -273,7 +273,7 @@ class TextRankCompressor:
             
         try:
             # 文档分块
-            chunks = self.doc_chunker.batch_chunk([doc])[0]
+            chunks = self.doc_chunker.batch_chunk(text_list=[doc],return_counts=False)[0]
             if not chunks:
                 self.logger.warning("Document chunking produced no chunks")
                 return ""
@@ -297,7 +297,7 @@ class TextRankCompressor:
                 f"window_size={self.window_size}, damping_factor={self.damping_factor}"
             )
             
-            return ''.join(selected_chunks)
+            return ''.join(selected_chunks),compression_ratio
             
         finally:
             # 恢复原始参数

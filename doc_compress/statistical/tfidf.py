@@ -185,4 +185,4 @@ class TFIDFCompressor:
         self.logger.log_info(f"Compression ratio: {compression_ratio:.2%}")
         
         # 返回压缩后的文档
-        return ''.join(selected_chunks)
+        return ''.join(selected_chunks),compression_ratio
