@@ -1,2 +1,3 @@
 scikit-learn
 networkx
+html2image
