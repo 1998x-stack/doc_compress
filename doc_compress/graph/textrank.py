@@ -11,6 +11,17 @@ import logging
 from enum import Enum
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
+from dataclasses import dataclass
+
+
+@dataclass
+class CompressionResult:
+    """压缩结果数据类"""
+
+    compressed_text: str  # 压缩后的文本
+    compression_ratio: float  # 压缩比例
+    selected_chunks: List[str]  # 选中的文本块
+    topic_scores: np.ndarray  # 主题得分
 
 
 
@@ -224,6 +235,55 @@ class TextRankCompressor:
         # 按原始顺序返回选中的块
         return [chunks[i] for i in sorted(top_indices)]
 
+
+    def _select_chunks(
+        self,
+        chunks: List[str],
+        scores: np.ndarray,
+        max_length: Optional[int] = None,
+        topn: Optional[int] = None,
+    ) -> List[str]:
+        """选择文本块
+
+        基于得分和约束条件选择文本块
+
+        Args:
+            chunks: 文本块列表
+            scores: 主题得分
+            max_length: 最大长度约束
+            topn: 选择前N个块
+
+        Returns:
+            List[str]: 选中的文本块列表
+        """
+        # 获取块的原始索引和长度
+        indices = list(range(len(chunks)))
+        lengths = [len(chunk) for chunk in chunks]
+
+        # 根据得分对索引排序
+        sorted_pairs = sorted(zip(indices, scores), key=lambda x: x[1], reverse=True)
+        sorted_indices = [pair[0] for pair in sorted_pairs]
+
+        selected_indices = []
+
+        if max_length is not None:
+            # 基于最大长度选择
+            current_length = 0
+            for idx in sorted_indices:
+                if current_length + lengths[idx] <= max_length:
+                    selected_indices.append(idx)
+                    current_length += lengths[idx]
+                else:
+                    break
+        else:
+            # 选择前N个块
+            selected_indices = sorted_indices[:topn]
+
+        # 按原始顺序返回选中的块
+        return [chunks[i] for i in sorted(selected_indices)]
+
+
+
     def compress(
         self,
         doc: str,
@@ -286,23 +346,23 @@ class TextRankCompressor:
             # 计算TextRank分数
             scores = self._calculate_textrank(chunks, query)
 
-            # 根据条件选择压缩方式
-            if max_length is not None:
-                selected_chunks = self._get_chunks_by_length(chunks, scores, max_length)
-            else:
-                # 如果指定了topN，使用topN方式
-                topn = min(topn, len(chunks))  # 确保topN不超过块数
-                selected_chunks = self._get_chunks_by_topn(chunks, scores, topn)
-
+            selected_chunks = self._select_chunks(chunks, scores, max_length, topn)
+            compressed_text = "".join(selected_chunks)
+            
             # 记录压缩信息
-            compression_ratio = len("".join(selected_chunks)) / len(doc)
+            compression_ratio = len(compressed_text) / len(doc)
             self.logger.info(f"Compression ratio: {compression_ratio:.2%}")
             self.logger.info(
                 f"TextRank parameters: edge_type={self.edge_type.value}, "
                 f"window_size={self.window_size}, damping_factor={self.damping_factor}"
             )
 
-            return "".join(selected_chunks), compression_ratio
+            return CompressionResult(
+                compressed_text=compressed_text,
+                compression_ratio=compression_ratio,
+                selected_chunks=selected_chunks,
+                topic_scores=scores,
+            )
 
         finally:
             # 恢复原始参数
