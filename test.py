@@ -57,7 +57,6 @@ def batch_process_csv(csv_file, file_path):
     elif args.language == "zh":
         csv_file = "zh" + csv_file
         file_path = file_path + "zh/"
-        # encoding=detect_encoding(file_path+csv_file)
 
     df = pd.read_csv(file_path + csv_file)
     df = df.head(5)
@@ -79,38 +78,39 @@ def batch_process_csv(csv_file, file_path):
 
     for _, row in df.iterrows():
         file_name = row["File Name"]
-        query = row["Query"]
+        querys = row["Query"]  # TODO：query增长
 
         encoding = detect_encoding(file_path + file_name)
 
         with open(file_path + file_name, "r", encoding=encoding, errors="ignore") as f:
             doc = f.read()
 
-        query_terms = query.split()
-        for term in query_terms:
-            compressed_doc_length, ratio1 = compressor.compress(
-                doc, query=term, max_length=300
+        query_terms = querys.split()
+        # query_terms = [""]
+        for query in query_terms:  # TODO: 将返回值进行封装
+            compressresult1 = compressor.compress(doc, query=query, max_length=300)
+            print(
+                f"Compressed Document by Length for {file_name} with query '{query}':"
             )
-            print(f"Compressed Document by Length for {file_name} with query '{term}':")
-            print(compressed_doc_length)
+            print(compressresult1.compressed_text)
 
-            compressed_doc_topn, ratio2 = compressor.compress(doc, query=term, topn=2)
-            print(f"Compressed Document by TopN for {file_name} with query '{term}':")
-            print(compressed_doc_topn)
+            compressresult2 = compressor.compress(doc, query=query, topn=2)
+            print(f"Compressed Document by TopN for {file_name} with query '{query}':")
+            print(compressresult2.compressed_text)
 
             similarity1, similarity2 = evaluate_similarity(
-                query, compressed_doc_length, compressed_doc_topn
+                query, compressresult1.compressed_text, compressresult2.compressed_text
             )
             results.append(
                 {
                     "File Name": file_name,
-                    "Query Term": term,
-                    "Compressed by Length": compressed_doc_length,
-                    "Compressed by TopN": compressed_doc_topn,
+                    "Query Term": query,
+                    "Compressed by Length": compressresult1.compressed_text,
+                    "Compressed by TopN": compressresult2.compressed_text,
                     "Similarity by Length": similarity1,
                     "Similarity by TopN": similarity2,
-                    "Compression Ratio by Length": ratio1,
-                    "Compression Ratio by TopN": ratio2,
+                    "Compression Ratio by Length": compressresult1.compression_ratio,
+                    "Compression Ratio by TopN": compressresult2.compression_ratio,
                 }
             )
 
@@ -123,7 +123,7 @@ csv_file = "_query.csv"
 file_path = "data/test_data/"
 
 
-sys.argv = ["test2.py", "positionrank", "en"]
+sys.argv = ["test.py", "bm25", "zh"]
 parser = argparse.ArgumentParser(
     description="Test TF-IDF and BM25 Document Compression"
 )
