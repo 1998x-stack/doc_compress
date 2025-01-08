@@ -63,8 +63,8 @@ class TFIDFCompressor:
         if query:
             # 使用查询词计算TF-IDF
             query_tokens = self.tokenize_func(query)
-            query_token_set = set(query_tokens)
-
+            query_token_set = set(query_tokens) # set? list?
+            
             # 计算查询词的IDF
             idf = {}
             for token in query_token_set:
