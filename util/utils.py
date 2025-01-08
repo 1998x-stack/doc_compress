@@ -6,6 +6,8 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__) + "/" + ".."))
 import re, math
 from lingua import Language, LanguageDetectorBuilder
 
+from util.time_util import calculate_execution_time
+
 
 ### CUSTOM LENGTH CALCULATION ###
 # 预编译正则表达式
@@ -21,7 +23,7 @@ COMBINED_PATTERN = re.compile(
 def calculate_custom_length(text: str) -> int:
     """
     计算自定义长度：
-    - 每个混合字母和数字的连续字符串计为0.1个字符/字符
+    - 每个混合字母和数字的连续字符串计为0.01个字符/字符
     - 每个纯英文单词计为0.47个字符
     - 每个纯数字计为0.01个字符
     - 其他字符（如中文）计为1个字符
@@ -69,7 +71,9 @@ languages = [
 detector = LanguageDetectorBuilder.from_languages(*languages).build()
 
 
+@calculate_execution_time(func_id="detect_language")
 def detect_language(text):
+    # TODO: 优化性能, 随机挑选一个连续50字符的子串进行检测
     try:
         lang = detector.detect_language_of(text).iso_code_639_1.name.lower()
         if lang in ["zh", "en"]:

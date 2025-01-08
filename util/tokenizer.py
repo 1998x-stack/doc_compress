@@ -5,6 +5,8 @@ import re
 from typing import List
 import jieba.posseg as pseg
 
+from util.time_util import calculate_execution_time
+
 ### STOP WORDS
 stopwords_zh_path = os.path.abspath(os.path.dirname(__file__) + '/../data/stopwords_zh.txt')
 STOPWORDS_ZH = set()
@@ -23,6 +25,7 @@ with open(stopwords_en_path, "r") as f:
 english_tokenizer = re.compile(r'\b\w+\b')
 FILTERED_TAGS = {'r', 'u', 'w', 'x', 'y'}  # 代词、助词、标点、非语素字、语气词
 
+@calculate_execution_time('tokenize_text')
 def tokenize_text(text: str, lang='zh') -> List[str]:
     if lang == 'zh':
         # 使用 jieba.posseg 对文本进行分词和词性标注
