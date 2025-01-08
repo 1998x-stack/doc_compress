@@ -80,7 +80,7 @@ class DocChunker:
         return final_segments
 
     @calculate_execution_time("DocChunker.batch_chunk")
-    def batch_chunk(self, text_list, max_length: int = 50, overlap_size: int = 10, return_counts: bool = True):
+    def batch_chunk(self, text_list, max_length: int = 10, overlap_size: int = 0, return_counts: bool = True):
         """
         将输入文本列表中的每个文本分割为句子，并将句子合并为最大长度为 max_length 的块。
         每个新块会引入前一个块的最后几个句子，重叠部分的总长度不超过 overlap_size。

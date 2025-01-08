@@ -3,6 +3,7 @@ token_length_en: 150
 topN: 5
 compressed_length: 512
 graph:
-  weight_method: coor/semantic/m3e
+  edge_type: coor/semantic/m3e
+  window_size: 50
   use_tfidf: false
   use_position: false
