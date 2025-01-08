@@ -12,6 +12,7 @@ from util.doc_chunk import DocChunker
 from util.tokenizer import tokenize_text
 from util.log_util import logger
 from dataclasses import dataclass
+from util.time_util import calculate_execution_time
 
 
 @dataclass
@@ -32,13 +33,11 @@ class TFIDFCompressor:
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self,doc_chunker,tokenize_func) -> None:
         """Initialize TFIDFCompressor."""
 
-        self.doc_chunker = (
-            DocChunker()
-        )  # doc_chunker: Instance of DocChunker for text chunking
-        self.tokenize_func = tokenize_text  # tokenize_func: Function that takes text and returns token list
+        self.doc_chunker = doc_chunker
+        self.tokenize_func = tokenize_func  # tokenize_func: Function that takes text and returns token list
         # 设置日志记录器
         self.logger = logger
 
@@ -201,6 +200,7 @@ class TFIDFCompressor:
         # 按原始顺序返回选中的块
         return [chunks[i] for i in sorted(selected_indices)]
 
+    @calculate_execution_time("compress")
     def compress(
         self,
         doc: str,
@@ -234,7 +234,7 @@ class TFIDFCompressor:
             raise ValueError("Either max_length or topn must be specified")
 
         # 文档分块
-        chunks = self.doc_chunker.batch_chunk([doc], return_counts=False)[0]
+        chunks = self.doc_chunker.batch_chunk([doc],return_counts=False)[0]
         if not chunks:
             self.logger.log_info("Document chunking produced no chunks")
             return ""

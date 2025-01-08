@@ -12,6 +12,7 @@ from enum import Enum
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
 from dataclasses import dataclass
+from util.time_util import calculate_execution_time
 
 
 @dataclass
@@ -283,7 +284,7 @@ class TextRankCompressor:
         return [chunks[i] for i in sorted(selected_indices)]
 
 
-
+    @calculate_execution_time("compress")
     def compress(
         self,
         doc: str,

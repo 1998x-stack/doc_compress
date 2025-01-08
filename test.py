@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import pandas as pd
 import chardet
+import json
 
 
 from doc_compress.statistical.tfidf import TFIDFCompressor
@@ -16,6 +17,7 @@ from doc_compress.graph.topicrank import TopicRankCompressor
 from util.embeddingmodel import EmbeddingModel, EmbeddingClient
 from util.doc_chunk import DocChunker
 from util.tokenizer import tokenize_text
+from config.config import Config
 
 
 def detect_encoding(file_path):
@@ -51,82 +53,117 @@ def evaluate_similarity(
 
 
 def batch_process_csv(csv_file, file_path):
+    config = Config()
     if args.language == "en":
         csv_file = "en" + csv_file
         file_path = file_path + "en/"
+        sentence_length = config.get_config("token_length_en")
+
     elif args.language == "zh":
         csv_file = "zh" + csv_file
         file_path = file_path + "zh/"
+        sentence_length = config.get_config("token_length_zh")
 
+    topn = config.get_config("topN")
+    max_length = config.get_config("compressed_length")
     df = pd.read_csv(file_path + csv_file)
-    df = df.head(5)
+    # df = df.head(20)
 
     if args.compressor == "bm25":
-        compressor = BM25Compressor()
+        compressor = BM25Compressor(
+            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        )
     elif args.compressor == "tfidf":
-        compressor = TFIDFCompressor()
+        compressor = TFIDFCompressor(
+            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        )
     elif args.compressor == "textrank":
-        compressor = TextRankCompressor(DocChunker(), tokenize_text)
+        compressor = TextRankCompressor(
+            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        )
     elif args.compressor == "singlerank":
-        compressor = SingleRankCompressor(DocChunker(), tokenize_text)
+        compressor = SingleRankCompressor(
+            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        )
     elif args.compressor == "positionrank":
-        compressor = PositionRankCompressor(DocChunker(), tokenize_text)
+        compressor = PositionRankCompressor(
+            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        )
     elif args.compressor == "topicrank":
-        compressor = TopicRankCompressor(DocChunker(), tokenize_text)
+        compressor = TopicRankCompressor(
+            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        )
 
     results = []
 
     for _, row in df.iterrows():
         file_name = row["File Name"]
-        querys = row["Query"]  # TODO：query增长
+        querys = row["Query"]
+        base_name, end = os.path.splitext(file_name)
+        for i in range(1, 11):
+            file_name = base_name + "_part" + str(i) + end
+            encoding = detect_encoding(file_path + file_name)
+            with open(
+                file_path + file_name, "r", encoding=encoding, errors="ignore"
+            ) as f:
+                doc = f.read()
 
-        encoding = detect_encoding(file_path + file_name)
+            query_terms = [
+                query.strip() for query in querys.split("?") if query.strip()
+            ]
+            # query_terms = [""]
+            for query in query_terms:
+                compressresult1 = compressor.compress(
+                    doc, query=query, max_length=max_length
+                )
+                print(
+                    f"Compressed Document by Length for {file_name} with query '{query}':"
+                )
+                print(compressresult1.compressed_text)
 
-        with open(file_path + file_name, "r", encoding=encoding, errors="ignore") as f:
-            doc = f.read()
+                compressresult2 = compressor.compress(doc, query=query, topn=topn)
+                print(
+                    f"Compressed Document by TopN for {file_name} with query '{query}':"
+                )
+                print(compressresult2.compressed_text)
 
-        query_terms = querys.split()
-        # query_terms = [""]
-        for query in query_terms:  # TODO: 将返回值进行封装
-            compressresult1 = compressor.compress(doc, query=query, max_length=300)
-            print(
-                f"Compressed Document by Length for {file_name} with query '{query}':"
-            )
-            print(compressresult1.compressed_text)
+                similarity1, similarity2 = evaluate_similarity(
+                    query,
+                    compressresult1.compressed_text,
+                    compressresult2.compressed_text,
+                )
 
-            compressresult2 = compressor.compress(doc, query=query, topn=2)
-            print(f"Compressed Document by TopN for {file_name} with query '{query}':")
-            print(compressresult2.compressed_text)
+                result = [
+                    {
+                        "File Name": file_name,
+                        "Query Term": query,
+                        "Compressed by Length": compressresult1.compressed_text,
+                        "Compressed by TopN": compressresult2.compressed_text,
+                        "Similarity by Length": similarity1,
+                        "Similarity by TopN": similarity2,
+                        "Compression Ratio by Length": compressresult1.compression_ratio,
+                        "Compression Ratio by TopN": compressresult2.compression_ratio,
+                    }
+                ]
 
-            similarity1, similarity2 = evaluate_similarity(
-                query, compressresult1.compressed_text, compressresult2.compressed_text
-            )
-            results.append(
-                {
-                    "File Name": file_name,
-                    "Query Term": query,
-                    "Compressed by Length": compressresult1.compressed_text,
-                    "Compressed by TopN": compressresult2.compressed_text,
-                    "Similarity by Length": similarity1,
-                    "Similarity by TopN": similarity2,
-                    "Compression Ratio by Length": compressresult1.compression_ratio,
-                    "Compression Ratio by TopN": compressresult2.compression_ratio,
-                }
-            )
+                results.append(result)
 
-    results_df = pd.DataFrame(results)
-    output_file_name = f"compressed_results_{args.compressor}_{args.language}.csv"
-    results_df.to_csv(output_file_name, index=False)
+    output_dir = "data/test_result"
+    output_file_name = (
+        f"{output_dir}/compressed_results_{args.compressor}_{args.language}.json"
+    )
+    with open(output_file_name, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=4)
 
 
-csv_file = "_query.csv"
-file_path = "data/test_data/"
+csv_file = "_file.csv"
+file_path = "data/test_data/split_files/"
 
 
-sys.argv = ["test.py", "bm25", "zh"]
-parser = argparse.ArgumentParser(
-    description="Test TF-IDF and BM25 Document Compression"
-)
+# sys.argv = ["test.py", "tfidf", "zh"]
+
+
+parser = argparse.ArgumentParser(description="Test Document Compression")
 parser.add_argument(
     "compressor",
     type=str,

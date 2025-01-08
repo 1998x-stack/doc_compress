@@ -10,6 +10,7 @@ import logging
 from sklearn.feature_extraction.text import TfidfVectorizer
 from doc_compress.graph.textrank import TextRankCompressor
 from dataclasses import dataclass
+from util.time_util import calculate_execution_time
 
 
 @dataclass
@@ -239,6 +240,7 @@ class SingleRankCompressor(TextRankCompressor):
         # 按原始顺序返回选中的块
         return [chunks[i] for i in sorted(selected_indices)]
 
+    @calculate_execution_time("compress")
     def compress(
         self,
         doc: str,
