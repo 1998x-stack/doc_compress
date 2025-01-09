@@ -6,10 +6,13 @@ import numpy as np
 import pandas as pd
 import chardet
 import json
+import jieba
+
 
 
 from doc_compress.statistical.tfidf import TFIDFCompressor
 from doc_compress.statistical.bm25 import BM25Compressor
+from doc_compress.graph.combinedrank import CombinedRankCompressor
 from doc_compress.graph.textrank import TextRankCompressor
 from doc_compress.graph.singlerank import SingleRankCompressor
 from doc_compress.graph.positionrank import PositionRankCompressor
@@ -67,6 +70,10 @@ def batch_process_csv(csv_file, file_path):
     topn = config.get_config("topN")
     max_length = config.get_config("compressed_length")
     df = pd.read_csv(file_path + csv_file)
+    use_tfidf = config.get_config("graph")["use_tfidf"]
+    use_position = config.get_config("graph")["use_position"]
+    window_size = config.get_config("graph")["window_size"]
+    
     # df = df.head(20)
 
     if args.compressor == "bm25":
@@ -78,20 +85,44 @@ def batch_process_csv(csv_file, file_path):
             DocChunker(max_sentence_length=sentence_length), tokenize_text
         )
     elif args.compressor == "textrank":
-        compressor = TextRankCompressor(
-            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        compressor = CombinedRankCompressor(
+            DocChunker(max_sentence_length=sentence_length),
+            tokenize_text,
+            window_size=window_size,
+            use_tfidf=False,
+            use_position=False,
         )
     elif args.compressor == "singlerank":
-        compressor = SingleRankCompressor(
-            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        compressor = CombinedRankCompressor(
+            DocChunker(max_sentence_length=sentence_length),
+            tokenize_text,
+            window_size=window_size,
+            use_tfidf=True,
+            use_position=False,
         )
     elif args.compressor == "positionrank":
-        compressor = PositionRankCompressor(
-            DocChunker(max_sentence_length=sentence_length), tokenize_text
+        compressor = CombinedRankCompressor(
+            DocChunker(max_sentence_length=sentence_length),
+            tokenize_text,
+            window_size=window_size,
+            use_tfidf=False,
+            use_position=True,
         )
-    elif args.compressor == "topicrank":
-        compressor = TopicRankCompressor(
-            DocChunker(max_sentence_length=sentence_length), tokenize_text
+    elif args.compressor == "pos+tfidfrank":
+        compressor = CombinedRankCompressor(
+            DocChunker(max_sentence_length=sentence_length),
+            tokenize_text,
+            window_size=window_size,
+            use_tfidf=True,
+            use_position=True,
+        )
+    else:
+        compressor = CombinedRankCompressor(
+            DocChunker(max_sentence_length=sentence_length),
+            tokenize_text,
+            window_size=window_size,
+            use_tfidf=use_tfidf,
+            use_position=use_position,
         )
 
     results = []
@@ -156,26 +187,33 @@ def batch_process_csv(csv_file, file_path):
         json.dump(results, f, ensure_ascii=False, indent=4)
 
 
-csv_file = "_file.csv"
-file_path = "data/test_data/split_files/"
+if __name__ == "__main__":
+    jieba.initialize()
+    csv_file = "_file.csv"
+    file_path = "data/test_data/split_files/"
 
+    sys.argv = ["test.py", "textrank", "en"]
 
-# sys.argv = ["test.py", "tfidf", "zh"]
+    parser = argparse.ArgumentParser(description="Test Document Compression")
+    parser.add_argument(
+        "compressor",
+        type=str,
+        choices=[
+            "tfidf",
+            "bm25",
+            "textrank",
+            "singlerank",
+            "positionrank",
+            "topicrank",
+            "pos_tfidfrank"
+        ],
+        help="Compressor type",
+    )
 
+    parser.add_argument(
+        "language", type=str, choices=["en", "zh"], help="Language of the documents"
+    )
+    args = parser.parse_args()
 
-parser = argparse.ArgumentParser(description="Test Document Compression")
-parser.add_argument(
-    "compressor",
-    type=str,
-    choices=["tfidf", "bm25", "textrank", "singlerank", "positionrank", "topicrank"],
-    help="Compressor type",
-)
-
-parser.add_argument(
-    "language", type=str, choices=["en", "zh"], help="Language of the documents"
-)
-args = parser.parse_args()
-
-
-# 执行批量处理
-batch_process_csv(csv_file, file_path)
+    # 执行批量处理
+    batch_process_csv(csv_file, file_path)

@@ -24,3 +24,4 @@ class Config:
 if __name__ == "__main__":
     config = Config()
     print(config.get_config("compressed_length"))
+    print(config.get_config("graph")["window_size"])

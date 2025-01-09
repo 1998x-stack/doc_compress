@@ -4,6 +4,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__) + "/" + ".."))
 
 
 import re, math
+import random
 from lingua import Language, LanguageDetectorBuilder
 
 from util.time_util import calculate_execution_time
@@ -29,6 +30,9 @@ def calculate_custom_length(text: str) -> int:
     - 其他字符（如中文）计为1个字符
     最终结果取下整
     """
+    # 去除空格
+    text = re.sub(r"\s+", "", text)
+
     total_length = 0
     last_index = 0  # 跟踪上一个匹配的结束位置
 
@@ -73,9 +77,16 @@ detector = LanguageDetectorBuilder.from_languages(*languages).build()
 
 @calculate_execution_time(func_id="detect_language")
 def detect_language(text):
-    # TODO: 优化性能, 随机挑选一个连续50字符的子串进行检测
     try:
-        lang = detector.detect_language_of(text).iso_code_639_1.name.lower()
+        if len(text) >= 50:
+            # 随机选择一个起始点，从中获取50个字符
+            start_index = random.randint(0, len(text) - 50)
+            substring = text[start_index : start_index + 50]
+        else:
+            # 如果文本长度不足50，则使用整个文本
+            substring = text
+
+        lang = detector.detect_language_of(substring).iso_code_639_1.name.lower()
         if lang in ["zh", "en"]:
             return lang
         else:
