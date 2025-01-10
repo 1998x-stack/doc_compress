@@ -11,6 +11,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict
 from dataclasses import dataclass
 from doc_compress.graph.textrank import TextRankCompressor
+from util.time_util import calculate_execution_time
+
 
 @dataclass
 class CompressionResult:
@@ -82,7 +84,7 @@ class CombinedRankCompressor(TextRankCompressor):
             self.tfidf_vectorizer = TfidfVectorizer(
                 tokenizer=tokenize_func,
                 lowercase=False,  # 保持原始大小写
-                **tfidf_kwargs
+                **tfidf_kwargs,
             )
         else:
             self.tfidf_vectorizer = None
@@ -137,36 +139,41 @@ class CombinedRankCompressor(TextRankCompressor):
         # 计算每个词的位置权重
         for token, positions in token_positions.items():
             # 位置权重 = Σ(1/position) * decay^(position_index)
-            weight = sum((1.0 / pos) * (self.position_weight_decay ** (pos - 1)) for pos in positions)
+            weight = sum(
+                (1.0 / pos) * (self.position_weight_decay ** (pos - 1))
+                for pos in positions
+            )
             position_weights[token] = weight
 
         return dict(position_weights)
 
     def _calculate_chunk_weights(
         self, chunks: List[str]
-    ) -> Tuple[Dict[str, float], List[Dict[str, float]]]:
+    ) -> Tuple[Dict[str, float], List[Dict[str, float]],List[List[str]]]:
         """计算全局TF-IDF权重和每个块的词语位置权重。
 
         Args:
             chunks: 文档块列表
 
         Returns:
-            Tuple[Dict[str, float], List[Dict[str, float]]]:
-                全局TF-IDF权重映射，每个块中词语的位置权重列表
+            Tuple[Dict[str, float], List[Dict[str, float]],List[List[str]]]:
+                全局TF-IDF权重映射，每个块中词语的位置权重列表，每个块的token列表
         """
         tfidf_weights = self._calculate_tfidf_weights(chunks)
         chunk_position_weights = []
-
+        chunk_tokens = []
         if self.use_position:
             for chunk in chunks:
                 tokens = self.tokenize_func(chunk)
+                chunk_tokens.append(tokens)
                 weights = self._calculate_position_weights(tokens)
                 chunk_position_weights.append(weights)
         else:
             # 如果不使用位置权重，则每个块的权重为空字典
             chunk_position_weights = [{} for _ in chunks]
+            chunk_tokens = [self.tokenize_func(chunk) for chunk in chunks]
 
-        return tfidf_weights, chunk_position_weights
+        return tfidf_weights, chunk_position_weights, chunk_tokens
 
     def _build_weighted_graph(
         self, chunks: List[str], query: Optional[str] = None
@@ -187,20 +194,21 @@ class CombinedRankCompressor(TextRankCompressor):
         graph = nx.Graph()
 
         # 计算全局TF-IDF权重和每个块的词语位置权重
-        tfidf_weights, chunk_position_weights = self._calculate_chunk_weights(chunks)
+        tfidf_weights, chunk_position_weights, chunk_tokens = (
+            self._calculate_chunk_weights(chunks)
+        )
 
         # 处理查询词（如果有）
         query_tokens = set()
         if query:
             query_tokens = set(self.tokenize_func(query))
 
-        # 对每个块进行分词
-        chunk_tokens = [self.tokenize_func(chunk) for chunk in chunks]
-
         # 统计共现关系并构建图
         for chunk_idx, tokens in enumerate(chunk_tokens):
             tfidf_weight = tfidf_weights if self.use_tfidf else {}
-            position_weights = chunk_position_weights[chunk_idx] if self.use_position else {}
+            position_weights = (
+                chunk_position_weights[chunk_idx] if self.use_position else {}
+            )
 
             for i in range(len(tokens)):
                 word1 = tokens[i]
@@ -212,9 +220,11 @@ class CombinedRankCompressor(TextRankCompressor):
                     # 计算边权重
                     weight = 1.0
                     if self.use_tfidf:
-                        weight *= tfidf_weight.get(word1, 0) * tfidf_weight.get(word2, 0)
+                        weight *= tfidf_weight.get(word1, 0) * tfidf_weight.get(
+                            word2, 0
+                        )
                     if self.use_position:
-                        weight *= (1.0 / (j - i))  # 距离衰减
+                        weight *= 1.0 / (j - i)  # 距离衰减
 
                     # 如果是查询相关词，增加权重
                     if query and (word1 in query_tokens or word2 in query_tokens):
@@ -226,7 +236,7 @@ class CombinedRankCompressor(TextRankCompressor):
                         else:
                             graph.add_edge(word1, word2, weight=weight)
 
-        return graph, tfidf_weights, chunk_position_weights
+        return graph, tfidf_weights, chunk_position_weights, chunk_tokens
 
     def _calculate_chunk_scores(
         self, chunks: List[str], query: Optional[str] = None
@@ -241,7 +251,9 @@ class CombinedRankCompressor(TextRankCompressor):
             List[float]: 每个块的得分
         """
         # 构建加权图
-        graph, tfidf_weights, chunk_position_weights = self._build_weighted_graph(chunks, query)
+        graph, tfidf_weights, chunk_position_weights, chunk_tokens = (
+            self._build_weighted_graph(chunks, query)
+        )
 
         # 如果图为空，返回零分数组
         if not graph:
@@ -250,7 +262,9 @@ class CombinedRankCompressor(TextRankCompressor):
 
         # 计算PageRank得分
         try:
-            pagerank_scores = nx.pagerank(graph, alpha=self.damping_factor, weight="weight")
+            pagerank_scores = nx.pagerank(
+                graph, alpha=self.damping_factor, weight="weight"
+            )
         except Exception as e:
             self.logger.error(f"PageRank计算失败: {str(e)}")
             return [0.0 for _ in chunks]
@@ -258,7 +272,7 @@ class CombinedRankCompressor(TextRankCompressor):
         # 计算每个块的得分
         scores = []
 
-        for i, tokens in enumerate([self.tokenize_func(chunk) for chunk in chunks]):
+        for i, tokens in enumerate(chunk_tokens):
             unique_tokens = set(tokens)
             chunk_score = 0.0
 
@@ -337,6 +351,7 @@ class CombinedRankCompressor(TextRankCompressor):
         selected_indices = sorted(selected_indices)
         return [chunks[i] for i in selected_indices]
 
+    @calculate_execution_time("compress")
     def compress(
         self,
         doc: str,
@@ -412,7 +427,8 @@ class CombinedRankCompressor(TextRankCompressor):
         except Exception as e:
             self.logger.error(f"文档压缩过程中发生错误: {str(e)}")
             raise
-        
+
+
 if __name__ == "__main__":
     import logging
     from util.doc_chunk import DocChunker
@@ -434,7 +450,7 @@ if __name__ == "__main__":
         use_tfidf=True,
         use_position=True,
         position_weight_decay=0.95,
-        tfidf_kwargs={"stop_words": "english"}  # 示例：移除英文停用词
+        tfidf_kwargs={"stop_words": "english"},  # 示例：移除英文停用词
     )
 
     # 示例文档
@@ -448,12 +464,7 @@ if __name__ == "__main__":
     query = "artificial intelligence"
 
     # 压缩文档
-    result = compressor.compress(
-        doc=document,
-        query=query,
-        max_length=200,
-        topn=2
-    )
+    result = compressor.compress(doc=document, query=query, max_length=200, topn=2)
 
     # 输出结果
     print("压缩后的文本:")
