@@ -1,3 +1,6 @@
+compressor_type: bm25
+language: en
+use_query: True
 token_length_zh: 128
 token_length_en: 150
 topN: 5
